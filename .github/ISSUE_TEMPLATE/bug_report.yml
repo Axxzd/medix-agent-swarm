@@ -1,0 +1,21 @@
+name: Bug report
+description: Report reproducible software behavior with synthetic inputs.
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Include the command, Python version and minimal synthetic input. Never include keys or patient data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Relevant test output
+      description: Remove credentials and identifying information before sharing.

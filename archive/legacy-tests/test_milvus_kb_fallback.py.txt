@@ -1,0 +1,57 @@
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from knowledge import milvus_kb
+
+
+class _FakeVector:
+    def __init__(self, values):
+        self._values = values
+
+    def tolist(self):
+        return self._values
+
+
+class _FakeEmbeddingModel:
+    def get_sentence_embedding_dimension(self):
+        return 2
+
+    def encode(self, texts, show_progress_bar=False):
+        vectors = []
+        for text in texts:
+            vectors.append(_FakeVector([1.0, 0.0] if "hypertension" in text else [0.0, 1.0]))
+        return vectors
+
+
+class _FailingMilvusClient:
+    def __init__(self, uri):
+        raise RuntimeError("milvus-lite is required for local database connections")
+
+
+def test_falls_back_to_local_json_store_when_milvus_lite_is_unavailable(tmp_path, monkeypatch):
+    milvus_kb.MedicalKnowledgeBase._instance = None
+    monkeypatch.setattr(milvus_kb, "SentenceTransformer", lambda *args, **kwargs: _FakeEmbeddingModel())
+    monkeypatch.setattr(milvus_kb, "MilvusClient", _FailingMilvusClient)
+
+    kb = milvus_kb.MedicalKnowledgeBase(
+        db_path=str(tmp_path / "milvus_lite.db"),
+        collection_name="test_collection",
+    )
+
+    added = kb.add_documents(
+        [
+            {
+                "id": "doc-1",
+                "content": "hypertension lifestyle guidance",
+                "metadata": {"type": "lifestyle", "disease": "hypertension"},
+            }
+        ]
+    )
+    results = kb.search("hypertension", top_k=1, filter_type="lifestyle")
+
+    assert added == 1
+    assert Path(str(tmp_path / "milvus_lite.json")).exists()
+    assert len(results) == 1
+    assert results[0]["metadata"]["disease"] == "hypertension"
